@@ -75,10 +75,8 @@ if not st.session_state.logged_in:
 # =========================================================
 
 model = joblib.load("fraud_model.pkl")
+data = pd.read_csv("creditcard.csv")
 
-data = pd.read_csv(
-    "creditcard.csv"
-)
 
 roc_data = joblib.load(
     "roc_data.pkl"

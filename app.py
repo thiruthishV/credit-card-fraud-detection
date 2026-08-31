@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import joblib
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 
 # =========================================================
@@ -13,6 +14,13 @@ st.set_page_config(
     page_icon="💳",
     layout="wide"
 )
+
+
+# =========================================================
+# FILE PATH
+# =========================================================
+
+BASE_DIR = Path(__file__).resolve().parent
 
 
 # =========================================================
@@ -37,9 +45,7 @@ if not st.session_state.logged_in:
         "Please login to access the fraud detection dashboard."
     )
 
-    username = st.text_input(
-        "Username"
-    )
+    username = st.text_input("Username")
 
     password = st.text_input(
         "Password",
@@ -55,68 +61,181 @@ if not st.session_state.logged_in:
 
             st.session_state.logged_in = True
 
-            st.success(
-                "✅ Login successful!"
-            )
+            st.success("✅ Login successful!")
 
             st.rerun()
 
         else:
 
-            st.error(
-                "❌ Invalid username or password"
-            )
+            st.error("❌ Invalid username or password")
 
     st.stop()
 
 
 # =========================================================
-# LOAD MODEL AND DATA
+# LOAD MODEL
 # =========================================================
 
-model = joblib.load("fraud_model.pkl")
-data = pd.read_csv("creditcard.csv")
+try:
+
+    model = joblib.load(
+        BASE_DIR / "fraud_model.pkl"
+    )
+
+except Exception as e:
+
+    st.error("❌ Fraud model could not be loaded.")
+
+    st.stop()
 
 
-roc_data = joblib.load(
-    "roc_data.pkl"
-)
+# =========================================================
+# LOAD ROC DATA
+# =========================================================
 
-auc_score = joblib.load(
-    "auc_score.pkl"
-)
+try:
 
-comparison = joblib.load(
-    "model_comparison.pkl"
-)
+    roc_data = joblib.load(
+        BASE_DIR / "roc_data.pkl"
+    )
+
+except Exception:
+
+    roc_data = None
+
+
+# =========================================================
+# LOAD AUC SCORE
+# =========================================================
+
+try:
+
+    auc_score = joblib.load(
+        BASE_DIR / "auc_score.pkl"
+    )
+
+except Exception:
+
+    auc_score = 0.0
+
+
+# =========================================================
+# LOAD MODEL COMPARISON
+# =========================================================
+
+try:
+
+    comparison = joblib.load(
+        BASE_DIR / "model_comparison.pkl"
+    )
+
+except Exception:
+
+    comparison = pd.DataFrame()
+
+
+# =========================================================
+# LOAD DATASET
+# =========================================================
+
+DATA_FILE = BASE_DIR / "creditcard.csv"
+
+data = None
+
+if DATA_FILE.exists():
+
+    try:
+
+        data = pd.read_csv(
+            DATA_FILE
+        )
+
+    except Exception as e:
+
+        st.warning(
+            "⚠️ Dataset could not be loaded."
+        )
 
 
 # =========================================================
 # DATASET INFORMATION
 # =========================================================
 
-total_transactions = len(data)
+if data is not None and "Class" in data.columns:
 
-normal_transactions = (
-    data["Class"] == 0
-).sum()
+    total_transactions = len(data)
 
-fraud_transactions = (
-    data["Class"] == 1
-).sum()
+    normal_transactions = (
+        data["Class"] == 0
+    ).sum()
+
+    fraud_transactions = (
+        data["Class"] == 1
+    ).sum()
+
+    model_features = data.drop(
+        "Class",
+        axis=1
+    ).columns.tolist()
+
+else:
+
+    total_transactions = 0
+    normal_transactions = 0
+    fraud_transactions = 0
+
+    # Get feature names directly from trained model
+    if hasattr(model, "feature_names_in_"):
+
+        model_features = list(
+            model.feature_names_in_
+        )
+
+    else:
+
+        model_features = [
+            "Time",
+            "V1",
+            "V2",
+            "V3",
+            "V4",
+            "V5",
+            "V6",
+            "V7",
+            "V8",
+            "V9",
+            "V10",
+            "V11",
+            "V12",
+            "V13",
+            "V14",
+            "V15",
+            "V16",
+            "V17",
+            "V18",
+            "V19",
+            "V20",
+            "V21",
+            "V22",
+            "V23",
+            "V24",
+            "V25",
+            "V26",
+            "V27",
+            "V28",
+            "Amount"
+        ]
 
 
 # =========================================================
-# SIDEBAR NAVIGATION
+# SIDEBAR
 # =========================================================
 
 with st.sidebar:
 
     st.header("💳 Fraud Detection")
 
-    st.success(
-        "👤 Admin Logged In"
-    )
+    st.success("👤 Admin Logged In")
 
     st.divider()
 
@@ -164,9 +283,7 @@ if page == "🏠 Home":
 
     st.divider()
 
-    st.header(
-        "🏠 Welcome to the System"
-    )
+    st.header("🏠 Welcome to the System")
 
     st.write(
         """
@@ -180,38 +297,61 @@ if page == "🏠 Home":
 
     st.divider()
 
-    st.header(
-        "📊 Project Overview"
-    )
+    st.header("📊 Project Overview")
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
 
-        st.metric(
-            "Total Transactions",
-            f"{total_transactions:,}"
-        )
+        if data is not None:
+
+            st.metric(
+                "Total Transactions",
+                f"{total_transactions:,}"
+            )
+
+        else:
+
+            st.metric(
+                "Total Transactions",
+                "Dataset not loaded"
+            )
 
     with col2:
 
-        st.metric(
-            "Normal Transactions",
-            f"{normal_transactions:,}"
-        )
+        if data is not None:
+
+            st.metric(
+                "Normal Transactions",
+                f"{normal_transactions:,}"
+            )
+
+        else:
+
+            st.metric(
+                "Normal Transactions",
+                "N/A"
+            )
 
     with col3:
 
-        st.metric(
-            "Fraud Transactions",
-            f"{fraud_transactions:,}"
-        )
+        if data is not None:
+
+            st.metric(
+                "Fraud Transactions",
+                f"{fraud_transactions:,}"
+            )
+
+        else:
+
+            st.metric(
+                "Fraud Transactions",
+                "N/A"
+            )
 
     st.divider()
 
-    st.header(
-        "🚀 System Features"
-    )
+    st.header("🚀 System Features")
 
     col1, col2 = st.columns(2)
 
@@ -249,9 +389,7 @@ if page == "🏠 Home":
 
     st.divider()
 
-    st.header(
-        "🧠 Machine Learning Model"
-    )
+    st.header("🧠 Machine Learning Model")
 
     st.write(
         """
@@ -289,31 +427,42 @@ elif page == "📊 Dashboard":
     # DATASET DASHBOARD
     # =====================================================
 
-    st.header(
-        "📊 Dataset Dashboard"
-    )
+    st.header("📊 Dataset Dashboard")
 
-    col1, col2, col3 = st.columns(3)
+    if data is not None:
 
-    with col1:
+        col1, col2, col3 = st.columns(3)
 
-        st.metric(
-            "Total Transactions",
-            f"{total_transactions:,}"
+        with col1:
+
+            st.metric(
+                "Total Transactions",
+                f"{total_transactions:,}"
+            )
+
+        with col2:
+
+            st.metric(
+                "Normal Transactions",
+                f"{normal_transactions:,}"
+            )
+
+        with col3:
+
+            st.metric(
+                "Fraud Transactions",
+                f"{fraud_transactions:,}"
+            )
+
+    else:
+
+        st.warning(
+            "⚠️ creditcard.csv is not available in the deployed app."
         )
 
-    with col2:
-
-        st.metric(
-            "Normal Transactions",
-            f"{normal_transactions:,}"
-        )
-
-    with col3:
-
-        st.metric(
-            "Fraud Transactions",
-            f"{fraud_transactions:,}"
+        st.info(
+            "Dataset-dependent dashboard statistics are unavailable, "
+            "but model prediction features can still be used."
         )
 
     st.divider()
@@ -322,60 +471,61 @@ elif page == "📊 Dashboard":
     # TRANSACTION DISTRIBUTION
     # =====================================================
 
-    st.header(
-        "📈 Transaction Distribution"
-    )
+    if data is not None:
 
-    distribution = pd.DataFrame({
-        "Transaction Type": [
-            "Normal",
-            "Fraud"
-        ],
-
-        "Count": [
-            normal_transactions,
-            fraud_transactions
-        ]
-    })
-
-    fig, ax = plt.subplots(
-        figsize=(10, 5)
-    )
-
-    ax.bar(
-        distribution["Transaction Type"],
-        distribution["Count"]
-    )
-
-    ax.set_xlabel(
-        "Transaction Type"
-    )
-
-    ax.set_ylabel(
-        "Number of Transactions"
-    )
-
-    ax.set_title(
-        "Normal vs Fraud Transactions"
-    )
-
-    for i, value in enumerate(
-        distribution["Count"]
-    ):
-
-        ax.text(
-            i,
-            value,
-            f"{value:,}",
-            ha="center",
-            va="bottom"
+        st.header(
+            "📈 Transaction Distribution"
         )
 
-    st.pyplot(fig)
+        distribution = pd.DataFrame({
+            "Transaction Type": [
+                "Normal",
+                "Fraud"
+            ],
+            "Count": [
+                normal_transactions,
+                fraud_transactions
+            ]
+        })
 
-    plt.close(fig)
+        fig, ax = plt.subplots(
+            figsize=(10, 5)
+        )
 
-    st.divider()
+        ax.bar(
+            distribution["Transaction Type"],
+            distribution["Count"]
+        )
+
+        ax.set_xlabel(
+            "Transaction Type"
+        )
+
+        ax.set_ylabel(
+            "Number of Transactions"
+        )
+
+        ax.set_title(
+            "Normal vs Fraud Transactions"
+        )
+
+        for i, value in enumerate(
+            distribution["Count"]
+        ):
+
+            ax.text(
+                i,
+                value,
+                f"{value:,}",
+                ha="center",
+                va="bottom"
+            )
+
+        st.pyplot(fig)
+
+        plt.close(fig)
+
+        st.divider()
 
     # =====================================================
     # MODEL PERFORMANCE
@@ -430,57 +580,55 @@ elif page == "📊 Dashboard":
         "📈 ROC-AUC Curve"
     )
 
-    st.write(
-        "ROC curve showing the performance of the "
-        "Random Forest fraud detection model."
-    )
+    if roc_data is not None:
 
-    fig, ax = plt.subplots(
-        figsize=(10, 6)
-    )
+        fig, ax = plt.subplots(
+            figsize=(10, 6)
+        )
 
-    ax.plot(
-        roc_data["FPR"],
-        roc_data["TPR"],
-        label=f"Random Forest (AUC = {auc_score:.4f})"
-    )
+        ax.plot(
+            roc_data["FPR"],
+            roc_data["TPR"],
+            label=f"Random Forest (AUC = {auc_score:.4f})"
+        )
 
-    ax.plot(
-        [0, 1],
-        [0, 1],
-        linestyle="--",
-        label="Random Classifier"
-    )
+        ax.plot(
+            [0, 1],
+            [0, 1],
+            linestyle="--",
+            label="Random Classifier"
+        )
 
-    ax.set_xlabel(
-        "False Positive Rate"
-    )
+        ax.set_xlabel(
+            "False Positive Rate"
+        )
 
-    ax.set_ylabel(
-        "True Positive Rate"
-    )
+        ax.set_ylabel(
+            "True Positive Rate"
+        )
 
-    ax.set_title(
-        "ROC Curve - Random Forest"
-    )
+        ax.set_title(
+            "ROC Curve - Random Forest"
+        )
 
-    ax.legend()
+        ax.legend()
 
-    ax.grid(True)
+        ax.grid(True)
 
-    st.pyplot(fig)
+        st.pyplot(fig)
 
-    plt.close(fig)
+        plt.close(fig)
 
-    st.metric(
-        "ROC-AUC Score",
-        f"{auc_score:.4f}"
-    )
+        st.metric(
+            "ROC-AUC Score",
+            f"{auc_score:.4f}"
+        )
 
-    st.success(
-        f"Random Forest achieved an excellent "
-        f"ROC-AUC score of {auc_score:.4f}."
-    )
+    else:
+
+        st.warning(
+            "ROC data is not available."
+        )
 
     st.divider()
 
@@ -544,114 +692,140 @@ elif page == "📊 Dashboard":
         "🤖 Model Comparison"
     )
 
-    st.write(
-        "Comparison between Logistic Regression and "
-        "Random Forest."
-    )
+    if not comparison.empty:
 
-    display_comparison = comparison.copy()
+        st.write(
+            "Comparison between Logistic Regression and Random Forest."
+        )
 
-    metrics = [
-        "Accuracy",
-        "Precision",
-        "Recall",
-        "F1 Score"
-    ]
+        display_comparison = comparison.copy()
 
-    display_comparison[metrics] = (
-        display_comparison[metrics].round(2)
-    )
+        metrics = [
+            "Accuracy",
+            "Precision",
+            "Recall",
+            "F1 Score"
+        ]
 
-    st.dataframe(
-        display_comparison,
-        width="stretch",
-        hide_index=True
-    )
+        existing_metrics = [
+            x for x in metrics
+            if x in display_comparison.columns
+        ]
 
-    st.subheader(
-        "📊 Performance Comparison"
-    )
+        if existing_metrics:
 
-    models = comparison["Model"]
+            display_comparison[
+                existing_metrics
+            ] = display_comparison[
+                existing_metrics
+            ].round(2)
 
-    x = range(
-        len(models)
-    )
+        st.dataframe(
+            display_comparison,
+            width="stretch",
+            hide_index=True
+        )
 
-    width = 0.18
+        if "Model" in comparison.columns:
 
-    fig, ax = plt.subplots(
-        figsize=(12, 6)
-    )
+            st.subheader(
+                "📊 Performance Comparison"
+            )
 
-    ax.bar(
-        [i - 1.5 * width for i in x],
-        comparison["Accuracy"],
-        width,
-        label="Accuracy"
-    )
+            models = comparison["Model"]
 
-    ax.bar(
-        [i - 0.5 * width for i in x],
-        comparison["Precision"],
-        width,
-        label="Precision"
-    )
+            x = range(
+                len(models)
+            )
 
-    ax.bar(
-        [i + 0.5 * width for i in x],
-        comparison["Recall"],
-        width,
-        label="Recall"
-    )
+            width = 0.18
 
-    ax.bar(
-        [i + 1.5 * width for i in x],
-        comparison["F1 Score"],
-        width,
-        label="F1 Score"
-    )
+            fig, ax = plt.subplots(
+                figsize=(12, 6)
+            )
 
-    ax.set_xticks(
-        list(x)
-    )
+            if "Accuracy" in comparison.columns:
 
-    ax.set_xticklabels(
-        models
-    )
+                ax.bar(
+                    [i - 1.5 * width for i in x],
+                    comparison["Accuracy"],
+                    width,
+                    label="Accuracy"
+                )
 
-    ax.set_ylabel(
-        "Score (%)"
-    )
+            if "Precision" in comparison.columns:
 
-    ax.set_xlabel(
-        "Machine Learning Model"
-    )
+                ax.bar(
+                    [i - 0.5 * width for i in x],
+                    comparison["Precision"],
+                    width,
+                    label="Precision"
+                )
 
-    ax.set_title(
-        "Machine Learning Model Performance Comparison"
-    )
+            if "Recall" in comparison.columns:
 
-    ax.legend()
+                ax.bar(
+                    [i + 0.5 * width for i in x],
+                    comparison["Recall"],
+                    width,
+                    label="Recall"
+                )
 
-    ax.grid(
-        axis="y",
-        alpha=0.3
-    )
+            if "F1 Score" in comparison.columns:
 
-    ax.set_ylim(
-        0,
-        105
-    )
+                ax.bar(
+                    [i + 1.5 * width for i in x],
+                    comparison["F1 Score"],
+                    width,
+                    label="F1 Score"
+                )
 
-    st.pyplot(fig)
+            ax.set_xticks(
+                list(x)
+            )
 
-    plt.close(fig)
+            ax.set_xticklabels(
+                models
+            )
 
-    st.success(
-        "🏆 Random Forest performs better overall "
-        "for this fraud detection project."
-    )
+            ax.set_ylabel(
+                "Score (%)"
+            )
+
+            ax.set_xlabel(
+                "Machine Learning Model"
+            )
+
+            ax.set_title(
+                "Machine Learning Model Performance Comparison"
+            )
+
+            ax.legend()
+
+            ax.grid(
+                axis="y",
+                alpha=0.3
+            )
+
+            ax.set_ylim(
+                0,
+                105
+            )
+
+            st.pyplot(fig)
+
+            plt.close(fig)
+
+        st.success(
+            "🏆 Random Forest performs better overall "
+            "for this fraud detection project."
+        )
+
+    else:
+
+        st.warning(
+            "Model comparison data is not available."
+        )
 
     st.divider()
 
@@ -663,67 +837,64 @@ elif page == "📊 Dashboard":
         "🔍 Feature Importance"
     )
 
-    st.write(
-        "Top features that contribute to the Random Forest "
-        "fraud detection prediction."
-    )
+    if hasattr(
+        model,
+        "feature_importances_"
+    ):
 
-    feature_names = data.drop(
-        "Class",
-        axis=1
-    ).columns
+        importance = model.feature_importances_
 
-    importance = model.feature_importances_
+        if len(model_features) == len(importance):
 
-    feature_importance = pd.DataFrame({
-        "Feature": feature_names,
-        "Importance": importance
-    })
+            feature_importance = pd.DataFrame({
+                "Feature": model_features,
+                "Importance": importance
+            })
 
-    feature_importance = feature_importance.sort_values(
-        by="Importance",
-        ascending=False
-    )
+            feature_importance = feature_importance.sort_values(
+                by="Importance",
+                ascending=False
+            )
 
-    top_features = feature_importance.head(
-        10
-    )
+            top_features = feature_importance.head(
+                10
+            )
 
-    fig, ax = plt.subplots(
-        figsize=(10, 6)
-    )
+            fig, ax = plt.subplots(
+                figsize=(10, 6)
+            )
 
-    ax.barh(
-        top_features["Feature"][::-1],
-        top_features["Importance"][::-1]
-    )
+            ax.barh(
+                top_features["Feature"][::-1],
+                top_features["Importance"][::-1]
+            )
 
-    ax.set_xlabel(
-        "Importance"
-    )
+            ax.set_xlabel(
+                "Importance"
+            )
 
-    ax.set_ylabel(
-        "Feature"
-    )
+            ax.set_ylabel(
+                "Feature"
+            )
 
-    ax.set_title(
-        "Top 10 Important Features"
-    )
+            ax.set_title(
+                "Top 10 Important Features"
+            )
 
-    ax.grid(
-        axis="x",
-        alpha=0.3
-    )
+            ax.grid(
+                axis="x",
+                alpha=0.3
+            )
 
-    st.pyplot(fig)
+            st.pyplot(fig)
 
-    plt.close(fig)
+            plt.close(fig)
 
-    st.dataframe(
-        top_features,
-        width="stretch",
-        hide_index=True
-    )
+            st.dataframe(
+                top_features,
+                width="stretch",
+                hide_index=True
+            )
 
 
 # =========================================================
@@ -750,168 +921,185 @@ elif page == "🔍 Prediction":
         "💳 Dataset Transaction Prediction"
     )
 
-    st.write(
-        "Select a transaction from the dataset and "
-        "check whether it is normal or fraudulent."
-    )
+    if data is not None:
 
-    transaction_type = st.selectbox(
-        "Choose transaction type",
-        [
-            "Normal Transaction",
-            "Fraud Transaction"
-        ]
-    )
-
-    if transaction_type == "Normal Transaction":
-
-        indexes = data[
-            data["Class"] == 0
-        ].index
-
-    else:
-
-        indexes = data[
-            data["Class"] == 1
-        ].index
-
-    selected_index = st.selectbox(
-        "Select Transaction ID",
-        indexes
-    )
-
-    transaction = data.loc[
-        selected_index
-    ]
-
-    st.subheader(
-        "💳 Transaction Details"
-    )
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-
-        st.metric(
-            "Transaction ID",
-            selected_index
+        st.write(
+            "Select a transaction from the dataset and "
+            "check whether it is normal or fraudulent."
         )
 
-    with col2:
-
-        st.metric(
-            "Amount",
-            f"${transaction['Amount']:.2f}"
+        transaction_type = st.selectbox(
+            "Choose transaction type",
+            [
+                "Normal Transaction",
+                "Fraud Transaction"
+            ]
         )
 
-    with col3:
+        if transaction_type == "Normal Transaction":
 
-        actual_class = (
-            "Fraud"
-            if transaction["Class"] == 1
-            else "Normal"
-        )
-
-        st.metric(
-            "Actual Class",
-            actual_class
-        )
-
-    st.subheader(
-        "📋 Transaction Features"
-    )
-
-    feature_data = transaction.drop(
-        "Class"
-    )
-
-    st.dataframe(
-        feature_data.to_frame("Value"),
-        width="stretch"
-    )
-
-    if st.button(
-        "🔍 Check Transaction",
-        width="stretch"
-    ):
-
-        input_data = transaction.drop(
-            "Class"
-        ).to_frame().T
-
-        prediction = model.predict(
-            input_data
-        )[0]
-
-        probability = model.predict_proba(
-            input_data
-        )[0]
-
-        normal_probability = (
-            probability[0] * 100
-        )
-
-        fraud_probability = (
-            probability[1] * 100
-        )
-
-        st.subheader(
-            "📊 Prediction Result"
-        )
-
-        if prediction == 1:
-
-            st.error(
-                "🚨 FRAUDULENT TRANSACTION"
-            )
+            indexes = data[
+                data["Class"] == 0
+            ].index
 
         else:
 
-            st.success(
-                "✅ NORMAL TRANSACTION"
+            indexes = data[
+                data["Class"] == 1
+            ].index
+
+        if len(indexes) > 0:
+
+            selected_index = st.selectbox(
+                "Select Transaction ID",
+                indexes
             )
 
-        col1, col2 = st.columns(2)
+            transaction = data.loc[
+                selected_index
+            ]
 
-        with col1:
-
-            st.metric(
-                "Normal Probability",
-                f"{normal_probability:.2f}%"
+            st.subheader(
+                "💳 Transaction Details"
             )
 
-        with col2:
+            col1, col2, col3 = st.columns(3)
 
-            st.metric(
-                "Fraud Probability",
-                f"{fraud_probability:.2f}%"
+            with col1:
+
+                st.metric(
+                    "Transaction ID",
+                    selected_index
+                )
+
+            with col2:
+
+                st.metric(
+                    "Amount",
+                    f"${transaction['Amount']:.2f}"
+                )
+
+            with col3:
+
+                actual_class = (
+                    "Fraud"
+                    if transaction["Class"] == 1
+                    else "Normal"
+                )
+
+                st.metric(
+                    "Actual Class",
+                    actual_class
+                )
+
+            st.subheader(
+                "📋 Transaction Features"
             )
 
-        predicted_class = (
-            "Fraud"
-            if prediction == 1
-            else "Normal"
-        )
-
-        st.subheader(
-            "🔎 Prediction Verification"
-        )
-
-        if predicted_class == actual_class:
-
-            st.success(
-                f"Prediction Correct ✅ | "
-                f"Actual: {actual_class} | "
-                f"Predicted: {predicted_class}"
+            feature_data = transaction.drop(
+                "Class"
             )
+
+            st.dataframe(
+                feature_data.to_frame("Value"),
+                width="stretch"
+            )
+
+            if st.button(
+                "🔍 Check Transaction",
+                width="stretch"
+            ):
+
+                input_data = transaction.drop(
+                    "Class"
+                ).to_frame().T
+
+                prediction = model.predict(
+                    input_data
+                )[0]
+
+                probability = model.predict_proba(
+                    input_data
+                )[0]
+
+                normal_probability = (
+                    probability[0] * 100
+                )
+
+                fraud_probability = (
+                    probability[1] * 100
+                )
+
+                st.subheader(
+                    "📊 Prediction Result"
+                )
+
+                if prediction == 1:
+
+                    st.error(
+                        "🚨 FRAUDULENT TRANSACTION"
+                    )
+
+                else:
+
+                    st.success(
+                        "✅ NORMAL TRANSACTION"
+                    )
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+
+                    st.metric(
+                        "Normal Probability",
+                        f"{normal_probability:.2f}%"
+                    )
+
+                with col2:
+
+                    st.metric(
+                        "Fraud Probability",
+                        f"{fraud_probability:.2f}%"
+                    )
+
+                predicted_class = (
+                    "Fraud"
+                    if prediction == 1
+                    else "Normal"
+                )
+
+                st.subheader(
+                    "🔎 Prediction Verification"
+                )
+
+                if predicted_class == actual_class:
+
+                    st.success(
+                        f"Prediction Correct ✅ | "
+                        f"Actual: {actual_class} | "
+                        f"Predicted: {predicted_class}"
+                    )
+
+                else:
+
+                    st.warning(
+                        f"Prediction Different ⚠️ | "
+                        f"Actual: {actual_class} | "
+                        f"Predicted: {predicted_class}"
+                    )
 
         else:
 
             st.warning(
-                f"Prediction Different ⚠️ | "
-                f"Actual: {actual_class} | "
-                f"Predicted: {predicted_class}"
+                "No transactions found for this class."
             )
+
+    else:
+
+        st.info(
+            "ℹ️ creditcard.csv is not included in the deployment. "
+            "Dataset transaction selection is unavailable."
+        )
 
     st.divider()
 
@@ -926,11 +1114,6 @@ elif page == "🔍 Prediction":
     st.write(
         "Enter transaction feature values manually."
     )
-
-    model_features = data.drop(
-        "Class",
-        axis=1
-    ).columns.tolist()
 
     manual_values = {}
 
@@ -978,95 +1161,103 @@ elif page == "🔍 Prediction":
             columns=model_features
         )
 
-        manual_prediction = model.predict(
-            manual_input
-        )[0]
+        try:
 
-        manual_probability = model.predict_proba(
-            manual_input
-        )[0]
+            manual_prediction = model.predict(
+                manual_input
+            )[0]
 
-        normal_probability = (
-            manual_probability[0] * 100
-        )
+            manual_probability = model.predict_proba(
+                manual_input
+            )[0]
 
-        fraud_probability = (
-            manual_probability[1] * 100
-        )
-
-        st.subheader(
-            "📊 Manual Prediction Result"
-        )
-
-        if manual_prediction == 1:
-
-            st.error(
-                "🚨 FRAUDULENT TRANSACTION DETECTED"
+            normal_probability = (
+                manual_probability[0] * 100
             )
 
-        else:
-
-            st.success(
-                "✅ TRANSACTION APPEARS NORMAL"
+            fraud_probability = (
+                manual_probability[1] * 100
             )
 
-        col1, col2 = st.columns(2)
-
-        with col1:
-
-            st.metric(
-                "Normal Probability",
-                f"{normal_probability:.2f}%"
+            st.subheader(
+                "📊 Manual Prediction Result"
             )
 
-        with col2:
+            if manual_prediction == 1:
 
-            st.metric(
-                "Fraud Probability",
+                st.error(
+                    "🚨 FRAUDULENT TRANSACTION DETECTED"
+                )
+
+            else:
+
+                st.success(
+                    "✅ TRANSACTION APPEARS NORMAL"
+                )
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+
+                st.metric(
+                    "Normal Probability",
+                    f"{normal_probability:.2f}%"
+                )
+
+            with col2:
+
+                st.metric(
+                    "Fraud Probability",
+                    f"{fraud_probability:.2f}%"
+                )
+
+            probability_data = pd.DataFrame({
+                "Probability": [
+                    normal_probability,
+                    fraud_probability
+                ]
+            }, index=[
+                "Normal",
+                "Fraud"
+            ])
+
+            st.subheader(
+                "📈 Prediction Probability"
+            )
+
+            st.bar_chart(
+                probability_data
+            )
+
+            predicted_label = (
+                "Fraud"
+                if manual_prediction == 1
+                else "Normal"
+            )
+
+            st.subheader(
+                "🔎 Prediction Summary"
+            )
+
+            st.info(
+                f"Model Prediction: **{predicted_label}**"
+            )
+
+            st.write(
+                f"💳 Transaction Amount: "
+                f"${manual_values.get('Amount', 0):.2f}"
+            )
+
+            st.write(
+                f"🧠 Fraud Probability: "
                 f"{fraud_probability:.2f}%"
             )
 
-        probability_data = pd.DataFrame({
-            "Probability": [
-                normal_probability,
-                fraud_probability
-            ]
-        }, index=[
-            "Normal",
-            "Fraud"
-        ])
+        except Exception as e:
 
-        st.subheader(
-            "📈 Prediction Probability"
-        )
-
-        st.bar_chart(
-            probability_data
-        )
-
-        predicted_label = (
-            "Fraud"
-            if manual_prediction == 1
-            else "Normal"
-        )
-
-        st.subheader(
-            "🔎 Prediction Summary"
-        )
-
-        st.info(
-            f"Model Prediction: **{predicted_label}**"
-        )
-
-        st.write(
-            f"💳 Transaction Amount: "
-            f"${manual_values['Amount']:.2f}"
-        )
-
-        st.write(
-            f"🧠 Fraud Probability: "
-            f"{fraud_probability:.2f}%"
-        )
+            st.error(
+                "❌ Prediction failed. Please check the feature values."
+            )
 
     st.divider()
 
@@ -1090,154 +1281,159 @@ elif page == "🔍 Prediction":
 
     if uploaded_file is not None:
 
-        uploaded_data = pd.read_csv(
-            uploaded_file
-        )
+        try:
 
-        st.subheader(
-            "📋 Uploaded Data"
-        )
+            uploaded_data = pd.read_csv(
+                uploaded_file
+            )
 
-        st.dataframe(
-            uploaded_data.head(10),
-            width="stretch"
-        )
+            st.subheader(
+                "📋 Uploaded Data"
+            )
 
-        required_features = data.drop(
-            "Class",
-            axis=1
-        ).columns.tolist()
+            st.dataframe(
+                uploaded_data.head(10),
+                width="stretch"
+            )
 
-        missing_features = [
-            feature
-            for feature in required_features
-            if feature not in uploaded_data.columns
-        ]
+            required_features = model_features
 
-        if missing_features:
+            missing_features = [
+                feature
+                for feature in required_features
+                if feature not in uploaded_data.columns
+            ]
+
+            if missing_features:
+
+                st.error(
+                    "❌ Missing required features:"
+                )
+
+                st.write(
+                    missing_features
+                )
+
+            else:
+
+                if st.button(
+                    "🚀 Predict All Transactions",
+                    width="stretch"
+                ):
+
+                    prediction_input = uploaded_data[
+                        required_features
+                    ]
+
+                    predictions = model.predict(
+                        prediction_input
+                    )
+
+                    probabilities = model.predict_proba(
+                        prediction_input
+                    )
+
+                    result_data = uploaded_data.copy()
+
+                    result_data["Prediction"] = [
+                        "Fraud"
+                        if prediction == 1
+                        else "Normal"
+                        for prediction in predictions
+                    ]
+
+                    result_data[
+                        "Fraud Probability (%)"
+                    ] = (
+                        probabilities[:, 1] * 100
+                    ).round(2)
+
+                    result_data[
+                        "Normal Probability (%)"
+                    ] = (
+                        probabilities[:, 0] * 100
+                    ).round(2)
+
+                    total_predictions = len(
+                        result_data
+                    )
+
+                    fraud_predictions = (
+                        result_data["Prediction"] == "Fraud"
+                    ).sum()
+
+                    normal_predictions = (
+                        result_data["Prediction"] == "Normal"
+                    ).sum()
+
+                    st.subheader(
+                        "📊 Batch Prediction Summary"
+                    )
+
+                    col1, col2, col3 = st.columns(3)
+
+                    with col1:
+
+                        st.metric(
+                            "Total Transactions",
+                            f"{total_predictions:,}"
+                        )
+
+                    with col2:
+
+                        st.metric(
+                            "Normal Transactions",
+                            f"{normal_predictions:,}"
+                        )
+
+                    with col3:
+
+                        st.metric(
+                            "Fraud Transactions",
+                            f"{fraud_predictions:,}"
+                        )
+
+                    if fraud_predictions > 0:
+
+                        st.warning(
+                            f"⚠️ {fraud_predictions} potentially "
+                            f"fraudulent transaction(s) detected."
+                        )
+
+                    else:
+
+                        st.success(
+                            "✅ No potentially fraudulent "
+                            "transactions detected."
+                        )
+
+                    st.subheader(
+                        "🔎 Prediction Results"
+                    )
+
+                    st.dataframe(
+                        result_data,
+                        width="stretch",
+                        hide_index=True
+                    )
+
+                    csv_result = result_data.to_csv(
+                        index=False
+                    )
+
+                    st.download_button(
+                        label="⬇️ Download Prediction Results",
+                        data=csv_result,
+                        file_name="fraud_prediction_results.csv",
+                        mime="text/csv",
+                        width="stretch"
+                    )
+
+        except Exception:
 
             st.error(
-                "❌ Missing required features:"
+                "❌ Could not read the uploaded CSV file."
             )
-
-            st.write(
-                missing_features
-            )
-
-        else:
-
-            if st.button(
-                "🚀 Predict All Transactions",
-                width="stretch"
-            ):
-
-                prediction_input = uploaded_data[
-                    required_features
-                ]
-
-                predictions = model.predict(
-                    prediction_input
-                )
-
-                probabilities = model.predict_proba(
-                    prediction_input
-                )
-
-                result_data = uploaded_data.copy()
-
-                result_data["Prediction"] = [
-                    "Fraud"
-                    if prediction == 1
-                    else "Normal"
-                    for prediction in predictions
-                ]
-
-                result_data[
-                    "Fraud Probability (%)"
-                ] = (
-                    probabilities[:, 1] * 100
-                ).round(2)
-
-                result_data[
-                    "Normal Probability (%)"
-                ] = (
-                    probabilities[:, 0] * 100
-                ).round(2)
-
-                total_predictions = len(
-                    result_data
-                )
-
-                fraud_predictions = (
-                    result_data["Prediction"] == "Fraud"
-                ).sum()
-
-                normal_predictions = (
-                    result_data["Prediction"] == "Normal"
-                ).sum()
-
-                st.subheader(
-                    "📊 Batch Prediction Summary"
-                )
-
-                col1, col2, col3 = st.columns(3)
-
-                with col1:
-
-                    st.metric(
-                        "Total Transactions",
-                        f"{total_predictions:,}"
-                    )
-
-                with col2:
-
-                    st.metric(
-                        "Normal Transactions",
-                        f"{normal_predictions:,}"
-                    )
-
-                with col3:
-
-                    st.metric(
-                        "Fraud Transactions",
-                        f"{fraud_predictions:,}"
-                    )
-
-                if fraud_predictions > 0:
-
-                    st.warning(
-                        f"⚠️ {fraud_predictions} potentially "
-                        f"fraudulent transaction(s) detected."
-                    )
-
-                else:
-
-                    st.success(
-                        "✅ No potentially fraudulent "
-                        "transactions detected."
-                    )
-
-                st.subheader(
-                    "🔎 Prediction Results"
-                )
-
-                st.dataframe(
-                    result_data,
-                    width="stretch",
-                    hide_index=True
-                )
-
-                csv_result = result_data.to_csv(
-                    index=False
-                )
-
-                st.download_button(
-                    label="⬇️ Download Prediction Results",
-                    data=csv_result,
-                    file_name="fraud_prediction_results.csv",
-                    mime="text/csv",
-                    width="stretch"
-                )
 
 
 # =========================================================
@@ -1311,15 +1507,23 @@ elif page == "📖 About Project":
         "📊 Dataset"
     )
 
-    st.write(
-        f"""
-        Total Transactions: {total_transactions:,}
+    if data is not None:
 
-        Normal Transactions: {normal_transactions:,}
+        st.write(
+            f"""
+            Total Transactions: {total_transactions:,}
 
-        Fraud Transactions: {fraud_transactions:,}
-        """
-    )
+            Normal Transactions: {normal_transactions:,}
+
+            Fraud Transactions: {fraud_transactions:,}
+            """
+        )
+
+    else:
+
+        st.warning(
+            "Dataset file is not included in the deployment."
+        )
 
     st.divider()
 
